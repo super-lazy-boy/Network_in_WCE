@@ -2,7 +2,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-sys.path.append("E:/code/Network_in_WCE")  # Adjust this path to your project directory
+sys.path.append("/home/zaq/code/Network_in_WCE")  # Adjust this path to your project directory
 
 from uav_rl.config import EnvConfig, TrainingConfig
 from uav_rl.trainer import Trainer

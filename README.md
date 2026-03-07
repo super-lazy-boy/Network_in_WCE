@@ -36,6 +36,8 @@ pip install numpy torch pytest
 python scripts/train.py --episodes 100 --out artifacts
 python scripts/evaluate.py --model artifacts/checkpoints/final.pt --episodes 10
 pytest -q
+# 用训练好的模型滚动环境，导出 NS-3 输入文件
+python scripts/export_ns3_trace.py --model artifacts/checkpoints/final.pt --steps 250 --out artifacts/ns3_trace.json
 ```
 
 ## 3. 环境设计要点
@@ -52,7 +54,26 @@ pytest -q
 
 - `uav_rl/gazebo_bridge.py` 提供 waypoint 指令构建与反馈解析结构，可直接封装进 ROS2 节点（订阅位姿，发布航点）。
 - `uav_rl/ns3_bridge.py` 导出可用于 NS-3 场景构建的节点位置、链路拓扑、PHY 参数与功率调度表。
-
+- 使用NS仿真（$NS3_ROOT为NS-3根目录）
+```bash
+cp ns3/uav_rl_scenario.cc $NS3_ROOT/scratch/
+cp artifacts/ns3_trace.json $NS3_ROOT/
+sudo apt-get update
+sudo apt-get install -y nlohmann-json3-dev #如果没安装
+cd $NS3_ROOT
+./ns3 configure
+./ns3 build
+./ns3 run "scratch/uav_rl_scenario \
+  --trace=ns3_trace.json \
+  --step=1.0 \
+  --applyTxPower=true \
+  --routing=OLSR \
+  --lossModel=LogDistance \
+  --trafficMode=random-pairs \
+  --topologyRange=350 \
+  --seed=1 \
+  --run=1"
+```
 ## 5. 研究扩展建议
 
 - 引入 Prioritized Replay、NoisyNet、Distributional DQN。

@@ -19,7 +19,16 @@ class Trainer:
     def train(self, checkpoint_dir: str = "checkpoints") -> Dict[str, List[float]]:
         Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
-        logs: Dict[str, List[float]] = {"episode_reward": [], "throughput": [], "connectivity": [], "loss": []}
+        logs: Dict[str, List[float]] = {
+            "episode_reward": [],
+            "throughput": [],
+            "connectivity": [],
+            "weak_link_ratio": [],
+            "energy_penalty": [],
+            "collision_penalty": [],
+            "reliability_proxy": [],
+            "loss": [],
+        }
         for ep in range(1, self.train_cfg.episodes + 1):
             state = self.env.reset()
             done = False
@@ -42,13 +51,20 @@ class Trainer:
             logs["throughput"].append(last_info.get("throughput", 0.0))
             logs["connectivity"].append(last_info.get("connectivity", 0.0))
             logs["loss"].append(float(np.mean(losses)) if losses else 0.0)
+            logs["weak_link_ratio"].append(last_info.get("weak_link_ratio", 0.0))
+            logs["energy_penalty"].append(last_info.get("energy_penalty", 0.0))
+            logs["collision_penalty"].append(last_info.get("collision_penalty", 0.0))
+            logs["reliability_proxy"].append(last_info.get("reliability_proxy", 0.0))
 
-            if ep % 25 == 0:
+            if ep % 100 == 0:
                 ckpt = Path(checkpoint_dir) / f"dqn_ep{ep}.pt"
                 self.agent.save(str(ckpt))
                 print(
                     f"[ep={ep}] reward={reward_sum:.3f} thr={logs['throughput'][-1]:.3f} "
                     f"conn={logs['connectivity'][-1]:.3f} eps={self.agent.epsilon():.3f}"
+                    f"loss={logs['loss'][-1]:.3f} wlr={logs['weak_link_ratio'][-1]:.3f} "
+                    f"ep={logs['episode_reward'][-1]:.3f} ep_penalty={logs['energy_penalty'][-1]:.3f} "
+                    f"col_penalty={logs['collision_penalty'][-1]:.3f} rel_proxy={logs['reliability_proxy'][-1]:.3f}"
                 )
         self.agent.save(str(Path(checkpoint_dir) / "final.pt"))
         return logs
