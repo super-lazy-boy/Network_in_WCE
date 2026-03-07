@@ -1,6 +1,7 @@
 import argparse
+import sys
 import numpy as np
-
+sys.path.append("E:/code/Network_in_WCE")
 from uav_rl.agent import DQNAgent
 from uav_rl.config import EnvConfig
 from uav_rl.env import UAVNetworkEnv

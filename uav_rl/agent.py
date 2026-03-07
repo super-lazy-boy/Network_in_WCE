@@ -108,6 +108,6 @@ class DQNAgent:
         torch.save({"online": self.online.state_dict(), "cfg": self.cfg.__dict__}, path)
 
     def load(self, path: str) -> None:
-        payload = torch.load(path, map_location=self.device)
+        payload = torch.load(path, map_location=self.device, weights_only=True)
         self.online.load_state_dict(payload["online"])
         self.target.load_state_dict(payload["online"])
