@@ -70,24 +70,32 @@ class UAVNetworkEnv:
             high=[self.cfg.grid_size, self.cfg.grid_size, self.cfg.max_height],
             size=(self.cfg.num_uavs, 3),
         ).astype(np.float32)
+
         self.targets = self.rng.uniform(
             low=[0, 0, self.cfg.min_height],
             high=[self.cfg.grid_size, self.cfg.grid_size, self.cfg.max_height],
             size=(self.cfg.num_uavs, 3),
         ).astype(np.float32)
+
         self.tx_powers.fill(self.cfg.min_tx_power_w)
         self.bandwidth_allocation.fill(self.cfg.total_bandwidth_hz / self.cfg.num_uavs)
         self.link_matrix.fill(0.0)
         self.step_count = 0
-        self._update_links(topology_policy=0)
+
+        # 先初始化信道与运动状态，再生成初始拓扑
         self.shadowing_db = self.rng.normal(
             0.0, self.cfg.shadowing_std_db, size=(self.cfg.num_uavs, self.cfg.num_uavs)
         ).astype(np.float32)
-        self.fast_fading_db.fill(0.0)
-        self.channel_bad_state.fill(0)
         self.shadowing_db = 0.5 * (self.shadowing_db + self.shadowing_db.T)
         np.fill_diagonal(self.shadowing_db, 0.0)
+
+        self.fast_fading_db.fill(0.0)
+        self.channel_bad_state.fill(0)
         self.velocities = self.rng.normal(0.0, 1.0, size=(self.cfg.num_uavs, 3)).astype(np.float32)
+
+        # 初始化完毕后再根据当前状态生成链路
+        self._update_links(topology_policy=0)
+
         return self._build_state()
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
@@ -106,6 +114,7 @@ class UAVNetworkEnv:
 
         # ---------- 3) 计算动作后网络指标 ----------
         throughput_mbps, weak_ratio = self._estimate_network_metrics()
+        reliability = self._reliability_proxy()
         connectivity = self._largest_component_ratio()
         collision_penalty = self._collision_penalty()
         energy_penalty = float(np.mean(self.tx_powers / self.cfg.max_tx_power_w))
@@ -152,6 +161,7 @@ class UAVNetworkEnv:
                 + self.cfg.reward_progress_weight * progress_gain
                 + self.cfg.reward_conn_gain_weight * conn_gain
                 + self.cfg.reward_weak_improve_weight * weak_gain
+                + 1.8 * reliability
                 - self.cfg.reward_weak_weight * weak_pen
                 - self.cfg.reward_energy_weight * energy_pen
                 - self.cfg.reward_collision_weight * collision_pen
@@ -175,6 +185,7 @@ class UAVNetworkEnv:
             "progress_gain": float(progress_gain),
             "conn_gain": float(conn_gain),
             "avg_target_dist": float(avg_target_dist),
+            "reliability_proxy": float(reliability),
             "reward_raw": float(reward),
         }
 
@@ -265,10 +276,10 @@ class UAVNetworkEnv:
             self.cfg.max_tx_power_w,
         )
 
-        distances_to_center = np.linalg.norm(
-            self.positions - np.array([self.cfg.grid_size / 2, self.cfg.grid_size / 2, 150.0], dtype=np.float32),
-            axis=1,
-        )
+        # distances_to_center = np.linalg.norm(
+        #     self.positions - np.array([self.cfg.grid_size / 2, self.cfg.grid_size / 2, 150.0], dtype=np.float32),
+        #     axis=1,
+        # )
         dist = self._pairwise_distance()
         rx_dbm = self._rx_power_dbm(dist)
         avg_link_margin = np.mean(rx_dbm - self.cfg.weak_link_threshold_dbm, axis=1)
@@ -464,9 +475,8 @@ class UAVNetworkEnv:
                 # 干扰项：所有其他发射机 k->j 的接收功率累计
                 interference_w = 0.0
                 for k in range(self.cfg.num_uavs):
-                    if k == i:
+                    if k == i or k == j:
                         continue
-                    # 只要 k 当前也有出边，就视作可能发射干扰
                     if np.sum(self.link_matrix[k]) > 0:
                         interference_w += 10 ** ((rx_dbm[k, j] - 30) / 10)
 
@@ -514,6 +524,33 @@ class UAVNetworkEnv:
     # def _path_progress_reward(self) -> float:
     #     d = np.linalg.norm(self.targets - self.positions, axis=1)
     #     return float(np.exp(-np.mean(d) / self.cfg.grid_size))
+
+    def _reliability_proxy(self) -> float:
+        """
+        可靠性代理：综合链路成功概率、整体连通性、弱链路比例。
+        不是严格物理层可靠性，但比单独 throughput 更接近论文中的 reliability 目标。
+        """
+        dist = self._pairwise_distance()
+        rx_dbm = self._rx_power_dbm(dist)
+
+        connected_links = np.where(self.link_matrix > 0)
+        if len(connected_links[0]) == 0:
+            return 0.0
+
+        success_prob = 0.0
+        cnt = 0
+        for i, j in zip(*connected_links):
+            margin = rx_dbm[i, j] - self.cfg.weak_link_threshold_dbm
+            p = 1.0 / (1.0 + np.exp(-0.35 * margin))
+            success_prob += p
+            cnt += 1
+
+        link_success = success_prob / max(cnt, 1)
+        connectivity = self._largest_component_ratio()
+        _, weak_ratio = self._estimate_network_metrics()
+
+        reliability = 0.45 * link_success + 0.45 * connectivity + 0.10 * (1.0 - weak_ratio)
+        return float(np.clip(reliability, 0.0, 1.0))
 
     def _collision_penalty(self) -> float:
         d = self._pairwise_distance()

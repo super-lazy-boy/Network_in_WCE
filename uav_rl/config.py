@@ -60,6 +60,40 @@ class EnvConfig:
     fading_memory: float = 0.85
 
     # =========================
+    # 真实弱通联信道增强参数
+    # =========================
+    # 阴影衰落标准差（dB）
+    shadowing_std_db: float = 4.0
+
+    # 对数距离路径损耗参考参数
+    reference_distance_m: float = 1.0
+    reference_loss_db: float = 40.0
+    path_loss_exponent: float = 2.4
+
+    # Rician K 因子（线性域）
+    rician_k_linear: float = 6.0
+
+    # 马尔可夫深衰落状态
+    channel_good_to_bad: float = 0.03
+    channel_bad_to_good: float = 0.10
+    deep_fade_extra_loss_db: float = 12.0
+
+    # 时间相关快衰落平滑
+    fading_memory: float = 0.85
+
+    # =========================
+    # 群集运动参数
+    # =========================
+    neighbor_radius_m: float = 220.0
+    separation_radius_m: float = 60.0
+    alignment_weight: float = 0.30
+    cohesion_weight: float = 0.25
+    separation_weight: float = 0.35
+    target_weight: float = 0.35
+    rl_direction_weight: float = 0.15
+    jitter_std: float = 0.08
+
+    # =========================
     # Reward 设计参数（论文级分层奖励）
     # =========================
 

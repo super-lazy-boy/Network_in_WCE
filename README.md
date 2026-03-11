@@ -37,7 +37,13 @@ python scripts/train.py --episodes 100 --out artifacts
 python scripts/evaluate.py --model artifacts/checkpoints/final.pt --episodes 10
 pytest -q
 # 用训练好的模型滚动环境，导出 NS-3 输入文件
-python scripts/export_ns3_trace.py --model artifacts/checkpoints/final.pt --steps 250 --out artifacts/ns3_trace.json
+python scripts/export_ns3_trace.py --model artifacts/checkpoints/best.pt --steps 250 --out artifacts/ns3_trace.json
+# 用训练好的模型滚动环境，导出 Gazebo 输入文件
+python scripts/export_gazebo_trace.py \
+  --model artifacts/checkpoints/best.pt \
+  --out artifacts/gazebo_trace.json \
+  --steps 250 \
+  --seed 42
 ```
 
 ## 3. 环境设计要点

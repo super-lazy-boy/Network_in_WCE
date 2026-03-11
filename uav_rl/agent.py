@@ -99,11 +99,12 @@ class DQNAgent:
 
     def epsilon(self) -> float:
         """
-        更平缓的 epsilon 衰减。
+        线性衰减到 epsilon_end，确保在 epsilon_decay_steps 之后
+        真正下降到配置的最小探索率，而不是停在 0.179 附近。
         """
         ratio = min(1.0, self.steps / self.cfg.epsilon_decay_steps)
-        return self.cfg.epsilon_end + (self.cfg.epsilon_start - self.cfg.epsilon_end) * math.exp(-2.0 * ratio)
-
+        eps = self.cfg.epsilon_start - (self.cfg.epsilon_start - self.cfg.epsilon_end) * ratio
+        return max(self.cfg.epsilon_end, eps)
     def act(self, state: np.ndarray, deterministic: bool = False) -> int:
         eps = 0.0 if deterministic else self.epsilon()
         self.steps += 1
