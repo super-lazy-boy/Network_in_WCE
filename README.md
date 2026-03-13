@@ -23,7 +23,7 @@ scripts/
   train.py             # 训练入口
   evaluate.py          # 推理评估入口
 tests/
-  test_env_smoke.py
+  test_env_smoke.py 
 ```
 
 ## 2. 快速开始
@@ -61,6 +61,7 @@ python scripts/export_gazebo_trace.py \
 - `uav_rl/gazebo_bridge.py` 提供 waypoint 指令构建与反馈解析结构，可直接封装进 ROS2 节点（订阅位姿，发布航点）。
 - `uav_rl/ns3_bridge.py` 导出可用于 NS-3 场景构建的节点位置、链路拓扑、PHY 参数与功率调度表。
 - 使用NS仿真（$NS3_ROOT为NS-3根目录）
+- 参考教程链接 https://blog.csdn.net/weixin_33759613/article/details/149821361
 ```bash
 cp ns3/uav_rl_scenario.cc $NS3_ROOT/scratch/
 cp artifacts/ns3_trace.json $NS3_ROOT/
@@ -79,6 +80,12 @@ cd $NS3_ROOT
   --topologyRange=350 \
   --seed=1 \
   --run=1"
+```
+- 使用 Gazebo 仿真环境（$GAZEBO_MODEL_PATH 包含 `uav_rl/models/`）（未完成）
+```bash
+cp artifacts/gazebo_trace.json ./ros2_ws/src/uav_simulation/traces
+cd ./ros2_ws
+./start.sh
 ```
 ## 5. 研究扩展建议
 
