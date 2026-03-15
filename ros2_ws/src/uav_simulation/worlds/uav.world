@@ -2,47 +2,46 @@
 <sdf version="1.6">
   <world name="default">
 
-    <gravity>0 0 -9.8</gravity>
+    <!-- 基本环境 -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
 
-    <light name="sun" type="directional">
-      <cast_shadows>true</cast_shadows>
-      <pose>0 0 100 0 0 0</pose>
-      <diffuse>0.8 0.8 0.8 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
-      <attenuation>
-        <range>20000</range>
-        <constant>0.9</constant>
-        <linear>0.001</linear>
-        <quadratic>0.0001</quadratic>
-      </attenuation>
-      <direction>-0.5 0.1 -0.9</direction>
-    </light>
+    <include>
+      <uri>model://sun</uri>
+    </include>
 
-    <model name="ground_plane">
-      <static>true</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>3000 3000</size>
-            </plane>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>3000 3000</size>
-            </plane>
-          </geometry>
-          <material>
-            <ambient>0.7 0.7 0.7 1</ambient>
-            <diffuse>0.7 0.7 0.7 1</diffuse>
-          </material>
-        </visual>
-      </link>
-    </model>
+    <!-- 物理参数 -->
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>false</shadows>
+    </scene>
+
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>-20 -20 20 0 0.6 0.8</pose>
+      </camera>
+    </gui>
+
+    <!--
+      核心插件：在 Gazebo 内部直接读取轨迹并控制所有 UAV 的位姿。
+      具体轨迹路径、比例、偏移等参数，优先从 launch 注入的环境变量读取。
+    -->
+    <plugin name="trace_motion_plugin" filename="libtrace_motion_plugin.so">
+      <trace_file></trace_file>
+      <position_scale>0.05</position_scale>
+      <z_offset>2.0</z_offset>
+      <playback_rate>1.0</playback_rate>
+      <loop>true</loop>
+      <start_delay>0.5</start_delay>
+    </plugin>
 
   </world>
 </sdf>

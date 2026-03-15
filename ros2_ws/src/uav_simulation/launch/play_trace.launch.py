@@ -5,13 +5,17 @@ import json
 import os
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, TimerAction
+from launch.actions import ExecuteProcess, TimerAction, SetEnvironmentVariable
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
     pkg_share = FindPackageShare('uav_simulation').find('uav_simulation')
+
+    # 安装后的 package 前缀目录：.../install/uav_simulation
+    pkg_prefix = os.path.dirname(os.path.dirname(pkg_share))
+    plugin_lib_path = os.path.join(pkg_prefix, 'lib')
 
     urdf_path = os.path.join(pkg_share, 'urdf', 'simple_uav.urdf')
     world_path = os.path.join(pkg_share, 'worlds', 'uav.world')
@@ -29,12 +33,59 @@ def generate_launch_description():
 
     first_frame = frames[0]
     uavs = first_frame.get('uavs', [])
+    if not uavs:
+        raise RuntimeError('gazebo_trace.json 第一帧没有 uavs')
 
-    # 统一缩放，避免初始位置太远看不见
     position_scale = 0.05
     z_offset = 2.0
+    playback_rate = 1.0
+    loop = 'true'
+    start_delay = 0.5
 
-    # 更稳的 Gazebo 启动方式：同时加载 init + factory
+    old_gazebo_plugin_path = os.environ.get('GAZEBO_PLUGIN_PATH', '')
+    if old_gazebo_plugin_path:
+        new_gazebo_plugin_path = f'{plugin_lib_path}:{old_gazebo_plugin_path}'
+    else:
+        new_gazebo_plugin_path = plugin_lib_path
+
+    # 让 Gazebo 能找到我们自己编译的插件
+    set_gazebo_plugin_path = SetEnvironmentVariable(
+        name='GAZEBO_PLUGIN_PATH',
+        value=new_gazebo_plugin_path
+    )
+
+    # 给 world plugin 注入参数
+    set_trace_file = SetEnvironmentVariable(
+        name='UAV_TRACE_FILE',
+        value=trace_path
+    )
+    set_position_scale = SetEnvironmentVariable(
+        name='UAV_POSITION_SCALE',
+        value=str(position_scale)
+    )
+    set_z_offset = SetEnvironmentVariable(
+        name='UAV_Z_OFFSET',
+        value=str(z_offset)
+    )
+    set_playback_rate = SetEnvironmentVariable(
+        name='UAV_PLAYBACK_RATE',
+        value=str(playback_rate)
+    )
+    set_loop = SetEnvironmentVariable(
+        name='UAV_LOOP',
+        value=loop
+    )
+    set_start_delay = SetEnvironmentVariable(
+        name='UAV_START_DELAY',
+        value=str(start_delay)
+    )
+
+    # 可选：减少 FastDDS SHM 报错
+    set_fastdds_transport = SetEnvironmentVariable(
+        name='FASTDDS_BUILTIN_TRANSPORTS',
+        value='UDPv4'
+    )
+
     gazebo = ExecuteProcess(
         cmd=[
             'gazebo',
@@ -55,7 +106,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 串行生成 UAV，避免同一时刻并发 spawn
+    # 仍然按第一帧把 UAV spawn 进来
     spawn_actions = []
     for i, uav in enumerate(uavs):
         entity_id = int(uav['id'])
@@ -80,7 +131,6 @@ def generate_launch_description():
             output='screen'
         )
 
-        # 第1架 8 秒开始，每架间隔 2 秒
         spawn_actions.append(
             TimerAction(
                 period=8.0 + i * 2.0,
@@ -88,31 +138,19 @@ def generate_launch_description():
             )
         )
 
-    # 更晚启动 trace_player，等所有模型基本生成完再播放
-    trace_player = TimerAction(
-        period=26.0,
-        actions=[
-            Node(
-                package='uav_simulation',
-                executable='trace_player',
-                name='trace_player',
-                output='screen',
-                parameters=[{
-                    'trace_file': trace_path,
-                    'loop': True,
-                    'playback_rate': 1.0,
-                    'position_scale': position_scale,
-                    'z_offset': z_offset
-                }]
-            )
-        ]
-    )
-
     actions = [
+        set_gazebo_plugin_path,
+        set_trace_file,
+        set_position_scale,
+        set_z_offset,
+        set_playback_rate,
+        set_loop,
+        set_start_delay,
+        set_fastdds_transport,
         gazebo,
         robot_state_publisher,
     ]
+
     actions.extend(spawn_actions)
-    actions.append(trace_player)
 
     return LaunchDescription(actions)
